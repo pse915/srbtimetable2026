@@ -1,0 +1,8 @@
+frontend/node_modules/
+**/__pycache__/
+.pytest_cache/
+.streamlit/secrets.toml
+test-results/
+playwright-report/
+tests/browser-artifacts/
+*.log

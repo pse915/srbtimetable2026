@@ -1,0 +1,247 @@
+--- a/timetable_app2.py
++++ b/timetable_app2.py
+@@ -3478,10 +3478,17 @@
+     st.session_state.pop("weekly_swap_candidates_key", None)
+     st.session_state.pop("weekly_dialog_swap_selected_row", None)
+     st.session_state.pop("weekly_cycle_candidates", None)
+     st.session_state.pop("weekly_cycle_candidates_msg", None)
+     st.session_state.pop("weekly_cycle_candidates_key", None)
++    st.session_state.pop("weekly_dialog_result", None)
++    st.session_state.pop("weekly_target_swap_selected_row", None)
++    st.session_state.pop("weekly_target_candidates_key", None)
++    st.session_state.pop("weekly_target_cycle_key", None)
++    st.session_state.pop("weekly_target_cycle_candidates", None)
++    st.session_state.pop("weekly_target_swap_candidates", None)
++    st.session_state.pop("weekly_target_search_requested", None)
+ def _validate_current_weekly_selection(lesson, *, use_test=False):
+     if not isinstance(lesson, dict):
+         return False
+     try:
+         ds = normalize_date_str(lesson.get("일자", ""))
+@@ -3552,15 +3559,23 @@
+             continue
+         if not teacher_slot_is_available(tt, source_day_check, source_period, ver):
+             continue
+         valid_rows.append(idx)
+     return df.loc[valid_rows].reset_index(drop=True)
+-def _weekly_fragment_rerun():
+-    try:
+-        st.rerun(scope="fragment")
+-    except TypeError:
+-        st.rerun()
++def _weekly_set_action_mode(mode):
++    """Streamlit button callback runs BEFORE the automatic dialog rerun."""
++    if mode in {"swap", "target", "absence", "substitute", "detail"}:
++        st.session_state["weekly_dialog_action_mode"] = mode
++
++
++def _weekly_extra_days_changed():
++    """Avoid a second fragment rerun after the slider's automatic rerun."""
++    st.session_state["weekly_dialog_extra_days"] = int(st.session_state.get("weekly_dialog_extra_days_input", 7))
++    st.session_state.pop("weekly_swap_candidates_key", None)
++    st.session_state.pop("weekly_cycle_candidates_key", None)
++
++
+ @contextmanager
+ def _weekly_dialog_loading(label: str):
+     with st.spinner(f"🔄 로딩 중... {label}"):
+         yield
+ def _dismiss_weekly_action_dialog():
+@@ -3570,12 +3585,27 @@
+ 
+ 
+ def _close_weekly_action_dialog():
+     """The explicit Close buttons must have the same effect as outside dismissal."""
+     _dismiss_weekly_action_dialog()
+-    # A full rerun closes the dialog and refreshes the table after a saved swap.
++    # Full script rerun is appropriate only AFTER the dialog is dismissed.
+     st.rerun()
++
++
++def _weekly_dialog_finish(message):
++    """Show the completed write without rerunning a live Streamlit dialog.
++
++    Streamlit reruns the dialog fragment on its own while a widget is used.
++    Running an extra fragment rerun after changing Sheets/session state was
++    fragile: the original selected lesson no longer exists after a swap.
++    We render success immediately, then close via the normal full-app path.
++    """
++    st.session_state["weekly_dialog_result"] = str(message)
++    st.success(str(message))
++    st.caption("시간표가 갱신되었습니다. 팝업을 닫으면 최신 주간표를 확인할 수 있습니다.")
++    if st.button("✖ 닫기", key="dlg_result_close", width="stretch"):
++        _close_weekly_action_dialog()
+ 
+ 
+ @st.dialog("🎯 수업 작업", width="large", on_dismiss=_dismiss_weekly_action_dialog)
+ def _weekly_action_dialog():
+     lesson = st.session_state.get("weekly_selected_lesson")
+@@ -3619,24 +3649,22 @@
+             ("substitute", "🟢 보강"),
+             ("detail", "ℹ️ 상세"),
+         ]
+         for col, (mode, label) in zip(nav_cols, nav_items):
+             with col:
+-                if st.button(label, type="primary" if mode == action_mode else "secondary",
+-                             key=f"dlg_action_{mode}", width="stretch"):
+-                    st.session_state.weekly_dialog_action_mode = mode
+-                    _weekly_fragment_rerun()
++                st.button(label, type="primary" if mode == action_mode else "secondary",
++                          key=f"dlg_action_{mode}", width="stretch",
++                          on_click=_weekly_set_action_mode, args=(mode,))
+         st.markdown(f"#### {dict(nav_items)[action_mode]}")
+     if action_mode == "swap":
+         alt_cols = st.columns(4)
+         alt_items = [("target", "📅 날짜·교시 지정"), ("absence", "📌 결강"),
+                      ("substitute", "🟢 보강"), ("detail", "ℹ️ 상세")]
+         for col, (mode, label) in zip(alt_cols, alt_items):
+             with col:
+-                if st.button(label, type="secondary", key=f"dlg_alt_{mode}", width="stretch"):
+-                    st.session_state.weekly_dialog_action_mode = mode
+-                    _weekly_fragment_rerun()
++                st.button(label, type="secondary", key=f"dlg_alt_{mode}", width="stretch",
++                          on_click=_weekly_set_action_mode, args=(mode,))
+     if status != "원본" and action_mode == "detail":
+         st.caption(
+             f"변경출처: {lesson.get('변경출처') or '-'} · 변경ID: {lesson.get('변경ID') or '-'} · "
+             f"원본: {lesson.get('원본교사') or '-'} / {lesson.get('원본일자') or '-'} / "
+             f"{lesson.get('원본교시') or '-'}교시"
+@@ -3647,17 +3675,13 @@
+         extra_days = st.slider(
+             "미래 추가 검색 일수", 0, 21, extra_days,
+             key="weekly_dialog_extra_days_input",
+             help="미래 날짜를 추가로 검색할 범위입니다.",
+             label_visibility="collapsed",
++            on_change=_weekly_extra_days_changed,
+         )
+         st.caption(f"미래 {extra_days}일 추가 검색")
+-        if extra_days != st.session_state.get("weekly_dialog_extra_days"):
+-            st.session_state.weekly_dialog_extra_days = extra_days
+-            st.session_state.pop("weekly_swap_candidates_key", None)
+-            st.session_state.pop("weekly_cycle_candidates_key", None)
+-            _weekly_fragment_rerun()
+     if action_mode == "swap":
+         cache_key = (
+             "same-class-only-v2",
+             str(lesson.get("교사명", "")), str(lesson.get("일자", "")), safe_int(lesson.get("교시", 0)),
+             str(lesson.get("학급", "")), str(lesson.get("과목", "")), int(extra_days), int(ver), bool(use_test)
+@@ -3744,18 +3768,12 @@
+                         ok = do_swap(lesson, b_info, lesson["일자"], b_info["일자"], is_test=use_test)
+                 except Exception as exc:
+                     st.error(f"맞교환 처리 중 오류가 발생했습니다: {exc}")
+                     ok = False
+                 if ok:
+-                    st.success("테스트 맞교환이 적용되었습니다." if use_test else "1:1 맞교환이 반영되었습니다.")
+-                    st.session_state.weekly_dialog_result = (
+-                        "테스트 맞교환이 적용되었습니다." if use_test else "1:1 맞교환이 반영되었습니다."
+-                    )
+-                    if use_test:
+-                        st.rerun(scope="fragment")
+-                    else:
+-                        _weekly_fragment_rerun()
++                    _weekly_dialog_finish("테스트 맞교환이 적용되었습니다." if use_test else "1:1 맞교환이 반영되었습니다.")
++                    return
+                 else:
+                     st.error("현재 상태에서는 이 1:1 맞교환을 적용할 수 없습니다. 최신 시간표 상태를 다시 확인해 주세요.")
+     elif action_mode == "target":
+         st.session_state["weekly_dialog_open"] = True
+         target_date_key = "weekly_dialog_target_date"
+@@ -3840,11 +3858,10 @@
+                     search_requested = True
+                     st.session_state.pop("weekly_target_swap_selected_row", None)
+                     st.session_state.weekly_target_candidates_key = None
+                     st.session_state.weekly_target_cycle_candidates = None
+                     st.session_state.weekly_target_cycle_msg = ""
+-                    st.rerun(scope="fragment")
+                 if not search_requested:
+                     st.caption("날짜와 교시를 선택한 뒤 위 버튼을 누르면 해당 시간의 1:1 교환을 먼저 확인합니다. 없으면 연계 순환을 자동으로 탐색합니다.")
+                     return
+                 stored_target_key = st.session_state.get("weekly_target_candidates_key")
+                 if stored_target_key != target_cache_key:
+@@ -3918,12 +3935,12 @@
+                                     ok = do_swap(lesson, b_info, lesson["일자"], b_info["일자"], is_test=use_test)
+                             except Exception as exc:
+                                 st.error(f"맞교환 처리 중 오류가 발생했습니다: {exc}")
+                                 ok = False
+                             if ok:
+-                                st.session_state.weekly_dialog_result = "테스트 맞교환이 적용되었습니다." if use_test else "1:1 맞교환이 반영되었습니다."
+-                                st.rerun(scope="fragment")
++                                _weekly_dialog_finish("테스트 맞교환이 적용되었습니다." if use_test else "1:1 맞교환이 반영되었습니다.")
++                                return
+                     else:
+                         st.info("교환하려는 수업을 위 표에서 클릭해 주세요.")
+                 else:
+                     st.warning("지정한 날짜·교시에 가능한 1:1 교환이 없습니다. 같은 시간대를 대상으로 연계 순환을 탐색합니다.")
+                     target_cycle_key = target_cache_key + ("cycle",)
+@@ -3961,19 +3978,16 @@
+                                             ok = apply_cycle_swaps(cyc["moves"], is_test=True if use_test else False)
+                                     except Exception as exc:
+                                         st.error(f"연계 순환 처리 중 오류가 발생했습니다: {exc}")
+                                         ok = False
+                                     if ok is not False:
+-                                        st.session_state.weekly_dialog_result = (
++                                        _weekly_dialog_finish(
+                                             f"테스트 {cyc.get('length','')}인 연계 순환이 적용되었습니다. 실제 저장되지는 않습니다."
+                                             if use_test else
+                                             f"{cyc.get('length','')}인 연계 순환이 적용되었습니다."
+                                         )
+-                                        if use_test:
+-                                            st.rerun(scope="fragment")
+-                                        else:
+-                                            _weekly_fragment_rerun()
++                                        return
+     elif action_mode == "absence":
+         r1, r2 = st.columns([1, 2])
+         with r1:
+             reason = st.selectbox("사유", ABSENCE_REASONS, key="dlg_abs_reason")
+         with r2:
+@@ -3984,13 +3998,12 @@
+                     ok = _register_absence_from_weekly(lesson, reason, detail)
+             except Exception as exc:
+                 st.error(f"결강 등록 중 오류가 발생했습니다: {exc}")
+                 ok = False
+             if ok:
+-                st.success("결강이 등록되었습니다.")
+-                st.session_state.weekly_dialog_result = "결강이 등록되었습니다."
+-                _weekly_fragment_rerun()
++                _weekly_dialog_finish("결강이 등록되었습니다.")
++                return
+     elif action_mode == "substitute":
+         with _weekly_dialog_loading("보강 후보 확인 중"):
+             cand = get_cached_substitute_recommendations(
+                 lesson["요일"], lesson["교시"], lesson["과목"], lesson["학급"], lesson["교사명"], lesson["일자"],
+                 top_n=10, include_part_time=True, version=ver
+@@ -4021,13 +4034,12 @@
+                             )
+                     except Exception as exc:
+                         st.error(f"보강 배정 중 오류가 발생했습니다: {exc}")
+                         ok = False
+                     if ok:
+-                        st.success("보강이 배정되었습니다.")
+-                        st.session_state.weekly_dialog_result = "보강이 배정되었습니다."
+-                        _weekly_fragment_rerun()
++                        _weekly_dialog_finish("보강이 배정되었습니다.")
++                        return
+             else:
+                 st.caption("이 수업에 등록된 결강이 없습니다. 결강 등록 후 바로 보강을 배정할 수 있습니다.")
+     elif action_mode == "detail":
+         detail_rows = [
+             ("교사", lesson.get("교사명", "")), ("일자", lesson.get("일자", "")),
+@@ -5916,11 +5928,16 @@
+     st.session_state.ui_font = selected
+     # dialog(fragment) 범위를 벗어나 전체 앱을 다시 렌더링해야 한다.
+     st.rerun(scope="app")
+ 
+ 
+-@st.dialog("도구", width="small")
++def _dismiss_tools_dialog():
++    """Drop temporary export form state; preserve theme, font and login."""
++    st.session_state.pop("top_output_mode", None)
++
++
++@st.dialog("도구", width="small", on_dismiss=_dismiss_tools_dialog)
+ def render_tools_dialog():
+     if current_role() == ROLE_GUEST:
+         st.caption("게스트 모드에서는 사용할 수 있는 도구가 없습니다.")
+         return
+     st.markdown('<div class="tool-section-title">화면</div>', unsafe_allow_html=True)

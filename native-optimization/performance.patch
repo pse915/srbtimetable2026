@@ -1,0 +1,10 @@
+--- a/timetable_app2.py
++++ b/timetable_app2.py
+@@ -2639,7 +2639,6 @@
+     duty_set = set()
+     duties_df = st.session_state.get("duties", pd.DataFrame())
+     if duties_df is not None and not duties_df.empty:
+-        dmask = (duties_df["교사명"].astype(str).str.strip() == str(absent_teacher).strip()) & (duties_df["일자"].astype(str).map(normalize_date_str) == norm)
+         duty_set = {(str(r.교사명).strip(), safe_int(r.교시)) for r in duties_df[duties_df["일자"].astype(str).map(normalize_date_str) == norm].itertuples(index=False)}
+     teacher_groups = defaultdict(set); teacher_grades = defaultdict(set)
+     if e_tt is not None and not e_tt.empty:

@@ -1,0 +1,16 @@
+{
+  "before": {
+    "samples": 9,
+    "calls_per_sample": 20,
+    "cpu_ms_median": 10.15625,
+    "elapsed_ms_median": 10.443095001392066
+  },
+  "after": {
+    "samples": 9,
+    "calls_per_sample": 20,
+    "cpu_ms_median": 7.03125,
+    "elapsed_ms_median": 6.831810000585392
+  },
+  "scope": "offline original recommend_substitutes, 5000 synthetic duty rows, four teachers; uncached inner function",
+  "identical_candidates_scores_order": true
+}
