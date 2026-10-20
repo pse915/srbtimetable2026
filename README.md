@@ -1,4 +1,18 @@
-> **2026-10-14 팝업 긴급 수정 후보:** 기존 Streamlit/React 양쪽 종료 흐름의 수정 내역 및 검증 제한은 [DIALOG_FIX_REPORT.md](DIALOG_FIX_REPORT.md)를 참고하세요. 이 루트는 React 전환 **평가용** 진입점입니다. 기존 운영 Streamlit 앱에 React 버전을 그대로 덮어쓰지 마세요.
+# 저장소 안내
+
+이 저장소에는 Streamlit 실행 파일, React 전환 후보, 검증 자료가 함께 있습니다.
+운영 주소: https://srbtimetable2026.streamlit.app/
+
+- 실행·개발 안내: 아래 기존 설명
+- 배포 및 복구: [DEPLOYMENT.md](DEPLOYMENT.md)
+- 유지보수: [MAINTENANCE.md](MAINTENANCE.md)
+- 검증·분석 보고서: [docs/reports/](docs/reports/)
+- 이번 파일 정리 범위: [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md)
+
+Cloud의 실제 실행 파일은 배포 설정에서 확인해야 합니다. 파일 이름만으로 운영 진입점을 단정하지 않습니다.
+
+---
+> **2026-10-14 팝업 긴급 수정 후보:** 기존 Streamlit/React 양쪽 종료 흐름의 수정 내역 및 검증 제한은 [DIALOG_FIX_REPORT.md](docs/reports/DIALOG_FIX_REPORT.md)를 참고하세요. 이 루트는 React 전환 **평가용** 진입점입니다. 기존 운영 Streamlit 앱에 React 버전을 그대로 덮어쓰지 마세요.
 
 # Timetable React 전환 검증 후보
 
@@ -63,10 +77,10 @@ QA 앱은 테스트 전용 가상 자료와 모의 워크시트를 사용합니�
 | `backend/repositories/sheets.py` | 기존 저장 형식, 충돌 감지·쓰기 차단 |
 | `frontend/src/App.tsx` | 메뉴·레이아웃·테마·확인 화면 |
 | `frontend/src/components/` | 입력, 달력, TanStack 표, 모달, 파일 UI |
-| `FEATURE_INVENTORY.md` | 원본의 204개 함수 정의, 282개 UI 호출 위치 |
-| `PARITY_REPORT.md` | 검증된 범위와 미검증 범위 |
-| `SOURCE_ANALYSIS.md` | 실제 시트·계산·권한 규칙 분석 |
-| `SECURITY_REPORT.md` | 보존한 취약점과 추가 보호 조치 |
+| `docs/reports/FEATURE_INVENTORY.md` | 원본의 204개 함수 정의, 282개 UI 호출 위치 |
+| `docs/reports/PARITY_REPORT.md` | 검증된 범위와 미검증 범위 |
+| `docs/reports/SOURCE_ANALYSIS.md` | 실제 시트·계산·권한 규칙 분석 |
+| `docs/reports/SECURITY_REPORT.md` | 보존한 취약점과 추가 보호 조치 |
 | `MAINTENANCE.md` | 유지보수와 회귀 테스트 방법 |
 | `screenshots/` | 로컬 가상 자료를 사용하는 실제 브라우저 캡처 |
 

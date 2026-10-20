@@ -72,5 +72,5 @@ for rec in records:
     rows.append(f"| {rec['id']} | {rec['menu']} | {rec['function']}:{rec['line']} | {rec['kind']} {rec['label']} | {conditions.replace('|','/')[:420]} | {', '.join(rec['sheets']) or '호출부/JSON 대조'} | NodeRenderer/{rec['kind']} | 해당 역할로 조건을 만족시켜 원본과 같은 입력·저장값 비교; 아직 전체 실행 안 함 | 미검증 |")
 head += '\n'.join(rows) + '\n\n## 모든 함수 정의\n\n| 원본 함수 | 시작 | 끝 | 상태 |\n|---|---|---|---|\n'
 head += '\n'.join(f"| {r['name']} | {r['line']} | {r['end']} | 보존 / 개별 동등성 미검증 |" for r in metadata['functions'])
-(ROOT/'FEATURE_INVENTORY.md').write_text(head+'\n',encoding='utf-8')
+(ROOT/'docs/reports/FEATURE_INVENTORY.md').write_text(head+'\n',encoding='utf-8')
 print(json.dumps({'functions':len(metadata['functions']),'ui_sites':len(records),'sha256':metadata['sha256']}))
