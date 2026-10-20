@@ -14,6 +14,7 @@ from backend.repositories.sheets import SheetRepository
 from backend.services.history import install_history
 from backend.services.calendar import install_calendar
 from backend.services.swaps import preview_swap,apply_preview
+from backend.services.exam import ExamService, EXAM_TAB, embedded_html
 
 CHUNK_BYTES = 192 * 1024
 MAX_FILE = 50 * 1024 * 1024
@@ -35,24 +36,32 @@ class Application:
         self.version=0
         self.response=None
         self.swap_preview=None
+        try: exam_settings=dict((secrets or {}).get('exam',{}))
+        except Exception: exam_settings={}
+        self.exam=ExamService(self,exam_settings)
         self._install_shell()
 
     def _install_shell(self):
         p=self.port; ns=self.program.namespace
         def toolbar(visible_tabs):
             state=p.session_state
+            visible_tabs=list(visible_tabs)
+            if state.get('logged_in') and ns['current_role']()!='게스트' and EXAM_TAB not in visible_tabs:
+                visible_tabs.append(EXAM_TAB)
             p.emit('navigation',tabs=visible_tabs,active=state.get('active_tab'))
             with p._region('toolbar'):
-                if p.button('새로고침',key='top_quick_refresh'):
-                    ns['_clear_gsheet_runtime_cache'](); ns['_invalidate_all_caches']()
-                if p.button('최신 자료 불러오기',key='top_quick_load'):
-                    state.pop('_react_worksheets',None)
-                    self.repo.baselines.clear(); self.repo.uncertain.clear()
-                    ns['_load_all_runtime_data_from_gsheet']()
-                if p.button('작업 저장',key='top_quick_save',type='primary'):
-                    if ns['save_work_data_to_gsheet'](): p.success('현재 작업을 저장했습니다.')
-                if p.button('도구',key='top_tools_open'): ns['render_tools_dialog']()
+                if state.get('active_tab')!=EXAM_TAB:
+                    if p.button('새로고침',key='top_quick_refresh'):
+                        ns['_clear_gsheet_runtime_cache'](); ns['_invalidate_all_caches']()
+                    if p.button('최신 자료 불러오기',key='top_quick_load'):
+                        state.pop('_react_worksheets',None)
+                        self.repo.baselines.clear(); self.repo.uncertain.clear()
+                        ns['_load_all_runtime_data_from_gsheet']()
+                    if p.button('작업 저장',key='top_quick_save',type='primary'):
+                        if ns['save_work_data_to_gsheet'](): p.success('현재 작업을 저장했습니다.')
+                    if p.button('도구',key='top_tools_open'): ns['render_tools_dialog']()
                 if p.button('로그아웃',key='top_logout'):
+                    self.exam.reset()
                     state.clear(); p.active_dialog=None; self.uploads.clear(); p.cache.clear()
                     p.widget_defaults.clear();p.editor_defaults.clear()
                     self.responses.clear();self.response=None;self.swap_preview=None
@@ -67,6 +76,15 @@ class Application:
 
     def _render(self,event=None):
         self.port.reset(event)
+        if self.port.session_state.get('active_tab')==EXAM_TAB and self.port.session_state.get('logged_in'):
+            ns=self.program.namespace
+            tabs=[t for t in ns['ALL_APP_TABS'] if t in self.program.call('get_user_allowed_tabs')]
+            if '교무호봉획정' not in tabs:tabs.append('교무호봉획정')
+            if self.program.call('can_manage_ids'):
+                for tab in ['🔑 아이디·권한 관리','📑 회원별 탭 권한 관리','🛠️ 다중 출장·전체 조정 추천']:
+                    if tab not in tabs:tabs.append(tab)
+            ns['render_top_toolbar'](tabs)
+            return
         for attempt in range(12):
             try:
                 self.program.run()
@@ -95,6 +113,9 @@ class Application:
                 for tab in ['🔑 아이디·권한 관리','📑 회원별 탭 권한 관리','🛠️ 다중 출장·전체 조정 추천']:
                     if tab not in tabs:tabs.append(tab)
             self.port.emit('navigation',tabs=tabs,active=self.port.session_state.get('active_tab'))
+        for node in self.port.nodes:
+            if node['kind']=='navigation' and self.port.session_state.get('logged_in') and self.program.call('current_role')!='게스트':
+                if EXAM_TAB not in node['tabs']:node['tabs'].append(EXAM_TAB)
 
     def _redact(self,text):
         for key in ('NEIS_API_KEY','GEMINI_API_KEY'):
@@ -105,11 +126,14 @@ class Application:
 
     def snapshot(self):
         ns=self.program.namespace; state=self.port.session_state
+        if not state.get('logged_in'):self.exam.reset()
         return {'nodes':self.port.nodes,'dataVersion':str(self.version),'response':self.response,
                 'user':{'id':state.get('user_id'),'name':state.get('user_name',''),'role':state.get('user_role','게스트')},
                 'loggedIn':state.get('logged_in',False),'school':ns['SCHOOL_NAME'],'date':datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y-%m-%d'),
                 'theme':state.get('ui_theme','light'),'font':state.get('ui_font',ns['UI_FONT_DEFAULT']),
                 'fontOptions':ns['UI_FONT_OPTIONS'],'writable':self.repo.writable,'activeTab':state.get('active_tab'),
+                'examHtml':embedded_html() if state.get('logged_in') and state.get('active_tab')==EXAM_TAB else None,
+                'examConfigured':self.exam.configured,
                 'swapPreview':{k:wire(v) for k,v in self.swap_preview.items() if k in ('token','a','b','test')} if self.swap_preview else None}
 
     def initialize(self):
@@ -139,6 +163,9 @@ class Application:
             try:
                 self._revalidate()
                 if previous['owner']!=self._owner():raise PermissionError('이전 계정의 요청입니다.')
+                if request.get('operation')=='exam_rpc':
+                    payload=request.get('payload',{})
+                    self.exam.authorize(payload.get('action'),payload.get('params',{}))
             except Exception as exc:
                 self._render()
                 self.response={'operation':request.get('operation'),'requestId':rid,'result':None,'success':False,'error':{'code':type(exc).__name__,'message':self._redact(str(exc))},'dataVersion':str(self.version)}
@@ -163,7 +190,7 @@ class Application:
             # downloads generated by a button alive during chunk transfer.
             state=self.port.session_state
             permitted=self.program.call('get_user_allowed_tabs')
-            if state.get('active_tab') and state.get('active_tab') not in permitted and state.get('active_tab')!='교무호봉획정':
+            if state.get('active_tab') and state.get('active_tab') not in permitted and state.get('active_tab') not in ('교무호봉획정',EXAM_TAB):
                 self.port.active_dialog=None
                 self.swap_preview=None
                 self._render()
@@ -174,7 +201,10 @@ class Application:
                 self._render()
             payload=request.get('payload')
             if not isinstance(payload,dict): raise ValueError('요청 본문 오류')
-            if operation=='navigate':
+            if operation=='exam_rpc':
+                if state.get('active_tab')!=EXAM_TAB:raise PermissionError('시험감독 메뉴에서 실행하세요.')
+                result=self.exam.call(payload.get('action'),payload.get('params',{}),rid)
+            elif operation=='navigate':
                 tabs=next((n['tabs'] for n in self.port.nodes if n['kind']=='navigation'),[])
                 tab=payload.get('tab')
                 if tab not in tabs: raise PermissionError('접근할 수 없는 메뉴입니다.')
@@ -212,7 +242,7 @@ class Application:
             else:
                 self._render()
         self.version+=1
-        if operation not in ('control','upload_chunk','download_chunk','upload_start','upload_cancel'):
+        if operation not in ('control','upload_chunk','download_chunk','upload_start','upload_cancel','exam_rpc'):
             self._render()
         if error is None and operation=='control':
             failure=next((n for n in self._walk(self.port.nodes) if n['kind']=='error'),None)

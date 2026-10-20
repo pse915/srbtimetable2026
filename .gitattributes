@@ -2,3 +2,7 @@
 legacy/timetable_app2_original.py -text whitespace=-blank-at-eol,-blank-at-eof
 legacy/timetable_app2_attached.py -text whitespace=-blank-at-eol,-blank-at-eof
 frontend/dist/* whitespace=-blank-at-eol,-blank-at-eof
+
+# Preserve supplied engine/UI bytes for source parity checks.
+exam/apps_script/Code.gs -text whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol
+exam/apps_script/Index.html -text whitespace=-blank-at-eol,-blank-at-eof,cr-at-eol

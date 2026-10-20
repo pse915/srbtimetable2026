@@ -13,3 +13,5 @@ tests/browser-artifacts/
 /native-performance-results.json
 /SHA256SUMS.json
 /native-optimization/performance.patch
+/tests/browser-results.json
+/tests/python-results.xml

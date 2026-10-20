@@ -48,7 +48,7 @@ export default function render(component:ComponentArgs) {
     if(mounts.get(host)!==active){reject(new Error('시간표 화면이 종료되었습니다.'));return;}
     const requestId=crypto.randomUUID();
     const request:RequestEnvelope={operation,requestId,payload,dataVersion:active.current.dataVersion};
-    const timer=setTimeout(()=>{active.pending.delete(requestId);reject(new Error('서버 응답을 확인하지 못했습니다. 저장 작업은 다시 누르기 전에 최신 자료를 확인하세요.'));},120000);
+    const timer=setTimeout(()=>{active.pending.delete(requestId);reject(new Error('서버 응답을 확인하지 못했습니다. 저장 작업은 다시 누르기 전에 최신 자료를 확인하세요.'));},operation==='exam_rpc'?240000:120000);
     active.pending.set(requestId,{resolve,reject,timer});
     try{active.setStateValue('request',request);}catch(error){
       clearTimeout(timer);active.pending.delete(requestId);
