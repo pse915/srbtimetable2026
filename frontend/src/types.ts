@@ -15,6 +15,7 @@ export interface Snapshot {
   loggedIn: boolean; school: string; date: string; theme: 'light'|'black';
   font: string; fontOptions: Record<string,string>; writable: boolean; activeTab?: string;
   swapPreview?: {token:string;a:Record<string,any>;b:Record<string,any>;test:boolean}|null;
+  examHtml?: string|null; examConfigured?: boolean;
 }
 export interface RequestEnvelope {
   operation: string; requestId: string; payload: Record<string,any>; dataVersion: string;

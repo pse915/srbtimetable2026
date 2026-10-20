@@ -18864,8 +18864,12 @@ function Nm({ node: e, send: t, busy: n, values: r }) {
 			},
 			children: [/* @__PURE__ */ (0, k.jsx)(br, { className: "modal-overlay" }), /* @__PURE__ */ (0, k.jsxs)(wr, {
 				className: "modal",
-				onPointerDownOutside: (e) => { if (n) e.preventDefault(); },
-				onEscapeKeyDown: (e) => { if (n) e.preventDefault(); },
+				onPointerDownOutside: (e) => {
+					n && e.preventDefault();
+				},
+				onEscapeKeyDown: (e) => {
+					n && e.preventDefault();
+				},
 				children: [
 					/* @__PURE__ */ (0, k.jsx)(Or, {
 						className: "modal-title",
@@ -19127,9 +19131,69 @@ function Nm({ node: e, send: t, busy: n, values: r }) {
 	}
 }
 //#endregion
+//#region src/components/ExamWorkspace.tsx
+function Pm({ html: e, send: t, owner: n }) {
+	let r = (0, _.useRef)(null), i = (0, _.useRef)(t);
+	return (0, _.useEffect)(() => {
+		i.current = t;
+	}, [t]), (0, _.useEffect)(() => {
+		let e = "", t = !0, n = !1, a = async (a) => {
+			if (a.source !== r.current?.contentWindow || !a.data || typeof a.data.channel != "string") return;
+			let o = a.data;
+			if (o.type === "exam-hello") {
+				e = o.channel, r.current?.contentWindow?.postMessage({
+					type: "exam-ready",
+					channel: e
+				}, "*");
+				return;
+			}
+			if (o.type !== "exam-request" || o.channel !== e || typeof o.id != "string" || typeof o.action != "string") return;
+			let s = (n, i) => {
+				t && r.current?.contentWindow?.postMessage({
+					type: "exam-result",
+					channel: e,
+					id: o.id,
+					result: n,
+					error: i
+				}, "*");
+			};
+			if (n) s(null, "이전 시험감독 요청이 처리 중입니다.");
+			else {
+				n = !0;
+				try {
+					let e = await i.current("exam_rpc", {
+						action: o.action,
+						params: o.payload ?? {}
+					});
+					s(e.result, e.success ? void 0 : e.error?.message ?? "요청 실패");
+				} catch (e) {
+					s(null, e instanceof Error ? e.message : String(e));
+				} finally {
+					n = !1;
+				}
+			}
+		};
+		return window.addEventListener("message", a), () => {
+			t = !1, window.removeEventListener("message", a);
+		};
+	}, [n]), /* @__PURE__ */ (0, k.jsx)("iframe", {
+		ref: r,
+		title: "시험감독 배정",
+		srcDoc: e,
+		sandbox: "allow-scripts allow-modals allow-downloads allow-popups allow-popups-to-escape-sandbox",
+		style: {
+			width: "100%",
+			height: "max(850px, 85vh)",
+			border: 0,
+			borderRadius: 12,
+			background: "#f3f6fb"
+		}
+	}, n);
+}
+//#endregion
 //#region src/App.tsx
-function Pm({ data: e, transport: t }) {
-	let [n, r] = (0, _.useState)(!1), [i, a] = (0, _.useState)(""), q = (0, _.useRef)(!1), { collapsed: o, search: s, settings: c, update: l } = dc(), u = (e) => l({ collapsed: e }), d = (e) => l({ search: e }), f = (e) => l({ settings: e }), p = uc((e) => e.values), m = uc((e) => e.clear), h = rc(e.nodes).find((e) => e.kind === "navigation")?.tabs ?? [], g = rc(e.nodes), v = [
+function Fm({ data: e, transport: t }) {
+	let [n, r] = (0, _.useState)(!1), [i, a] = (0, _.useState)(""), o = (0, _.useRef)(!1), { collapsed: s, search: c, settings: l, update: u } = dc(), d = (e) => u({ collapsed: e }), f = (e) => u({ search: e }), p = (e) => u({ settings: e }), m = uc((e) => e.values), h = uc((e) => e.clear), g = rc(e.nodes).find((e) => e.kind === "navigation")?.tabs ?? [], v = rc(e.nodes), y = [
 		"text_input",
 		"text_area",
 		"selectbox",
@@ -19138,38 +19202,54 @@ function Pm({ data: e, transport: t }) {
 		"slider",
 		"date_input",
 		"editor"
-	], y = () => Object.fromEntries(g.filter((e) => v.includes(e.kind) && !e.disabled && e.id in p).map((e) => [e.id, p[e.id]])), b = async (e, i) => {
-		if (q.current && !e.endsWith("chunk")) {
-			a("이전 작업이 처리 중입니다.");
-			return { operation: e, requestId: "", success: !1, result: null, error: { code: "Busy", message: "이전 작업이 처리 중입니다." }, dataVersion: "" };
-		}
-		q.current = !0; r(!0), a("");
+	], b = () => Object.fromEntries(v.filter((e) => y.includes(e.kind) && !e.disabled && e.id in m).map((e) => [e.id, m[e.id]])), x = async (n, i) => {
+		if (o.current && !n.endsWith("chunk")) return a("이전 작업이 처리 중입니다."), {
+			operation: n,
+			requestId: "",
+			success: !1,
+			result: null,
+			error: {
+				code: "Busy",
+				message: "이전 작업이 처리 중입니다."
+			},
+			dataVersion: e.dataVersion
+		};
+		o.current = !0, r(!0), a("");
 		try {
-			let n = await t(e, i);
-			return n.success ? !e.startsWith("upload_") && e !== "download_chunk" && m() : a(n.error?.message ?? "작업을 완료하지 못했습니다."), n;
-		} catch (err) {
-			let message = err instanceof Error ? err.message : String(err);
-			a(message);
-			return { operation: e, requestId: "", success: !1, result: null, error: { code: "TransportError", message }, dataVersion: "" };
+			let e = await t(n, i);
+			return e.success ? !n.startsWith("upload_") && n !== "download_chunk" && h() : a(e.error?.message ?? "작업을 완료하지 못했습니다."), e;
+		} catch (t) {
+			let r = t instanceof Error ? t.message : String(t);
+			return a(r), {
+				operation: n,
+				requestId: "",
+				success: !1,
+				result: null,
+				error: {
+					code: "TransportError",
+					message: r
+				},
+				dataVersion: e.dataVersion
+			};
 		} finally {
-			q.current = !1; r(!1);
+			o.current = !1, r(!1);
 		}
 	};
 	(0, _.useEffect)(() => {
-		e.loggedIn || (m(), fc.getState().clear());
-	}, [e.loggedIn, m]), (0, _.useEffect)(() => {
+		e.loggedIn || (h(), fc.getState().clear());
+	}, [e.loggedIn, h]), (0, _.useEffect)(() => {
 		let e = window.matchMedia("(max-width:1024px)"), t = () => dc.getState().update({ collapsed: e.matches });
 		return e.addEventListener("change", t), () => e.removeEventListener("change", t);
 	}, []);
-	function x(e) {
+	function S(e) {
 		return e.includes("호봉") ? Os : e.includes("권한") ? Ks : e.includes("맞교환") || e.includes("테스트") ? cs : e.includes("통계") ? fs : e.includes("강사") ? ec : e.includes("복무") || e.includes("출장") ? Ss : us;
 	}
-	let S = e.theme === "black" ? "dark" : "light", C = String(e.activeTab ?? "로그인").replace(/^[^가-힣A-Za-z]+/, ""), w = e.nodes.filter((e) => e.kind !== "navigation"), T = (t, n = e.font) => void b("preferences", {
+	let C = e.theme === "black" ? "dark" : "light", w = String(e.activeTab ?? "로그인").replace(/^[^가-힣A-Za-z]+/, ""), T = e.nodes.filter((e) => e.kind !== "navigation"), ee = (t, n = e.font) => void x("preferences", {
 		theme: t,
 		font: n
 	});
 	return /* @__PURE__ */ (0, k.jsx)(Do, { children: /* @__PURE__ */ (0, k.jsxs)("div", {
-		className: `timetable-app ${S} ${o ? "sidebar-closed" : ""} ${e.loggedIn ? "" : "login-app"}`,
+		className: `timetable-app ${C} ${s ? "sidebar-closed" : ""} ${e.loggedIn ? "" : "login-app"}`,
 		style: { fontFamily: e.fontOptions[e.font] },
 		children: [
 			e.loggedIn && /* @__PURE__ */ (0, k.jsxs)("aside", {
@@ -19186,7 +19266,7 @@ function Pm({ data: e, transport: t }) {
 							/* @__PURE__ */ (0, k.jsx)(cp, {
 								"aria-label": "사이드바 접기",
 								variant: "ghost",
-								onClick: () => u(!0),
+								onClick: () => d(!0),
 								children: /* @__PURE__ */ (0, k.jsx)(Rs, { size: 17 })
 							})
 						]
@@ -19196,8 +19276,8 @@ function Pm({ data: e, transport: t }) {
 						children: [/* @__PURE__ */ (0, k.jsx)(Hs, { size: 15 }), /* @__PURE__ */ (0, k.jsx)("input", {
 							"aria-label": "메뉴 검색",
 							placeholder: "업무 찾기",
-							value: s,
-							onChange: (e) => d(e.target.value)
+							value: c,
+							onChange: (e) => f(e.target.value)
 						})]
 					}),
 					/* @__PURE__ */ (0, k.jsx)("nav", {
@@ -19205,18 +19285,19 @@ function Pm({ data: e, transport: t }) {
 						children: [
 							"수업 운영",
 							"교무 행정",
+							"연구 평가",
 							"관리"
 						].map((t) => {
-							let r = h.filter((e) => t === "관리" ? e.includes("권한") : t === "교무 행정" ? e.includes("호봉") || e.includes("복무") || e.includes("출장") : !e.includes("권한") && !e.includes("호봉") && !e.includes("복무") && !e.includes("출장")).filter((e) => e.includes(s));
+							let r = g.filter((e) => t === "연구 평가" ? e === "시험감독 배정" : e === "시험감독 배정" ? !1 : t === "관리" ? e.includes("권한") : t === "교무 행정" ? e.includes("호봉") || e.includes("복무") || e.includes("출장") : !e.includes("권한") && !e.includes("호봉") && !e.includes("복무") && !e.includes("출장")).filter((e) => e.includes(c));
 							return r.length ? /* @__PURE__ */ (0, k.jsxs)("div", {
 								className: "nav-group",
 								children: [/* @__PURE__ */ (0, k.jsx)("p", { children: t }), r.map((t) => {
-									let r = x(t);
+									let r = S(t);
 									return /* @__PURE__ */ (0, k.jsxs)("button", {
 										disabled: n,
 										"aria-current": t === e.activeTab ? "page" : void 0,
 										className: t === e.activeTab ? "nav-item active" : "nav-item",
-										onClick: () => void b("navigate", { tab: t }),
+										onClick: () => void x("navigate", { tab: t }),
 										children: [
 											/* @__PURE__ */ (0, k.jsx)(r, { size: 17 }),
 											/* @__PURE__ */ (0, k.jsx)("span", { children: t.replace(/^[^가-힣A-Za-z]+/, "") }),
@@ -19246,14 +19327,14 @@ function Pm({ data: e, transport: t }) {
 							children: [e.loggedIn && /* @__PURE__ */ (0, k.jsx)(cp, {
 								variant: "ghost",
 								"aria-label": "메뉴 열기",
-								onClick: () => u(!o),
+								onClick: () => d(!s),
 								children: /* @__PURE__ */ (0, k.jsx)(Ps, { size: 20 })
 							}), /* @__PURE__ */ (0, k.jsxs)("span", {
 								className: "breadcrumb",
 								children: [
 									e.school,
 									/* @__PURE__ */ (0, k.jsx)(gs, { size: 13 }),
-									/* @__PURE__ */ (0, k.jsx)("strong", { children: C })
+									/* @__PURE__ */ (0, k.jsx)("strong", { children: w })
 								]
 							})]
 						}), /* @__PURE__ */ (0, k.jsxs)("div", {
@@ -19267,10 +19348,10 @@ function Pm({ data: e, transport: t }) {
 									asChild: !0,
 									children: /* @__PURE__ */ (0, k.jsx)(cp, {
 										variant: "ghost",
-										"aria-label": S === "dark" ? "라이트 테마" : "다크 테마",
+										"aria-label": C === "dark" ? "라이트 테마" : "다크 테마",
 										disabled: n,
-										onClick: () => T(S === "dark" ? "light" : "black"),
-										children: S === "dark" ? /* @__PURE__ */ (0, k.jsx)(Js, { size: 18 }) : /* @__PURE__ */ (0, k.jsx)(Is, { size: 18 })
+										onClick: () => ee(C === "dark" ? "light" : "black"),
+										children: C === "dark" ? /* @__PURE__ */ (0, k.jsx)(Js, { size: 18 }) : /* @__PURE__ */ (0, k.jsx)(Is, { size: 18 })
 									})
 								}), /* @__PURE__ */ (0, k.jsx)(Lo, {
 									className: "tooltip",
@@ -19279,7 +19360,7 @@ function Pm({ data: e, transport: t }) {
 								/* @__PURE__ */ (0, k.jsx)(cp, {
 									variant: "ghost",
 									"aria-label": "설정",
-									onClick: () => f(!0),
+									onClick: () => p(!0),
 									children: /* @__PURE__ */ (0, k.jsx)(Ws, { size: 18 })
 								})
 							]
@@ -19295,7 +19376,7 @@ function Pm({ data: e, transport: t }) {
 										className: "eyebrow",
 										children: ["SCHOOL OPERATIONS · ", e.date]
 									}),
-									/* @__PURE__ */ (0, k.jsx)("h1", { children: e.loggedIn ? C : "학교 업무의 새로운 흐름" }),
+									/* @__PURE__ */ (0, k.jsx)("h1", { children: e.loggedIn ? w : "학교 업무의 새로운 흐름" }),
 									/* @__PURE__ */ (0, k.jsx)("p", { children: e.loggedIn ? "시간표와 교무 업무를 한 곳에서 관리하세요." : "기존 아이디로 로그인하여 업무를 시작하세요." })
 								] }), e.loggedIn && /* @__PURE__ */ (0, k.jsxs)("span", {
 									className: "date-chip",
@@ -19317,11 +19398,27 @@ function Pm({ data: e, transport: t }) {
 							}),
 							/* @__PURE__ */ (0, k.jsx)("div", {
 								className: e.loggedIn ? "workspace" : "login-workspace",
-								children: w.map((e) => /* @__PURE__ */ (0, k.jsx)(Nm, {
+								children: e.activeTab === "시험감독 배정" && e.examHtml ? /* @__PURE__ */ (0, k.jsxs)(k.Fragment, { children: [
+									T.map((e) => /* @__PURE__ */ (0, k.jsx)(Nm, {
+										node: e,
+										send: x,
+										busy: n,
+										values: b
+									}, e.id)),
+									!e.examConfigured && /* @__PURE__ */ (0, k.jsx)("div", {
+										className: "notice warning",
+										children: "시험감독 연결 설정이 필요합니다. README의 exam 설정을 완료하세요. 현재 시트는 변경하지 않습니다."
+									}),
+									/* @__PURE__ */ (0, k.jsx)(Pm, {
+										html: e.examHtml,
+										send: x,
+										owner: JSON.stringify(e.user)
+									})
+								] }) : T.map((e) => /* @__PURE__ */ (0, k.jsx)(Nm, {
 									node: e,
-									send: b,
+									send: x,
 									busy: n,
-									values: y
+									values: b
 								}, e.id))
 							})
 						]
@@ -19335,12 +19432,16 @@ function Pm({ data: e, transport: t }) {
 			/* @__PURE__ */ (0, k.jsxs)(gr, {
 				open: !!e.swapPreview,
 				onOpenChange: (e) => {
-					!e && !q.current && b("cancel_swap_preview", {});
+					!e && !o.current && x("cancel_swap_preview", {});
 				},
 				children: [/* @__PURE__ */ (0, k.jsx)(br, { className: "modal-overlay" }), /* @__PURE__ */ (0, k.jsxs)(wr, {
 					className: "modal settings-modal",
-					onPointerDownOutside: (e) => { if (n) e.preventDefault(); },
-					onEscapeKeyDown: (e) => { if (n) e.preventDefault(); },
+					onPointerDownOutside: (e) => {
+						n && e.preventDefault();
+					},
+					onEscapeKeyDown: (e) => {
+						n && e.preventDefault();
+					},
 					children: [
 						/* @__PURE__ */ (0, k.jsx)(Or, {
 							className: "modal-title",
@@ -19379,12 +19480,12 @@ function Pm({ data: e, transport: t }) {
 							/* @__PURE__ */ (0, k.jsx)(cp, {
 								disabled: n,
 								variant: "default",
-								onClick: () => void b("apply_swap_preview", { token: e.swapPreview.token }),
+								onClick: () => void x("apply_swap_preview", { token: e.swapPreview.token }),
 								children: e.swapPreview.test ? "테스트에 적용" : "확인 후 저장"
 							}),
 							/* @__PURE__ */ (0, k.jsx)(cp, {
 								disabled: n,
-								onClick: () => void b("cancel_swap_preview", {}),
+								onClick: () => void x("cancel_swap_preview", {}),
 								children: "취소"
 							})
 						] })
@@ -19392,8 +19493,8 @@ function Pm({ data: e, transport: t }) {
 				})]
 			}),
 			/* @__PURE__ */ (0, k.jsxs)(gr, {
-				open: c,
-				onOpenChange: f,
+				open: l,
+				onOpenChange: p,
 				children: [/* @__PURE__ */ (0, k.jsx)(br, { className: "modal-overlay" }), /* @__PURE__ */ (0, k.jsxs)(wr, {
 					className: "modal settings-modal",
 					children: [
@@ -19405,10 +19506,10 @@ function Pm({ data: e, transport: t }) {
 						/* @__PURE__ */ (0, k.jsxs)("div", {
 							className: "segments",
 							children: [/* @__PURE__ */ (0, k.jsx)(cp, {
-								onClick: () => T("light"),
+								onClick: () => ee("light"),
 								children: "Light"
 							}), /* @__PURE__ */ (0, k.jsx)(cp, {
-								onClick: () => T("black"),
+								onClick: () => ee("black"),
 								children: "Dark"
 							})]
 						}),
@@ -19416,7 +19517,7 @@ function Pm({ data: e, transport: t }) {
 							className: "field",
 							children: [/* @__PURE__ */ (0, k.jsx)("span", { children: "글꼴" }), /* @__PURE__ */ (0, k.jsx)("select", {
 								value: e.font,
-								onChange: (t) => T(e.theme, t.target.value),
+								onChange: (t) => ee(e.theme, t.target.value),
 								children: Object.keys(e.fontOptions).map((e) => /* @__PURE__ */ (0, k.jsx)("option", { children: e }, e))
 							})]
 						}),
@@ -19431,24 +19532,38 @@ function Pm({ data: e, transport: t }) {
 	}) });
 }
 //#endregion
-//#region src/component.tsx
-var Fm = /* @__PURE__ */ new WeakMap();
-class TimetableRenderError extends _.Component {
-	constructor(props) { super(props); this.state = { failed: false }; }
-	static getDerivedStateFromError() { return { failed: true }; }
-	componentDidCatch(error, info) { console.error("Timetable UI render failed", error, info.componentStack); }
+//#region src/components/AppErrorBoundary.tsx
+var Im = class extends _.Component {
+	state = { failed: !1 };
+	static getDerivedStateFromError() {
+		return { failed: !0 };
+	}
+	componentDidCatch(e, t) {
+		console.error("Timetable UI render failed", e, t.componentStack);
+	}
 	render() {
 		return this.state.failed ? /* @__PURE__ */ (0, k.jsxs)("section", {
-			role: "alert", className: "timetable-render-error",
-			style: { padding: "2rem", maxWidth: 640, margin: "5rem auto", fontFamily: "sans-serif" },
-			children: [/* @__PURE__ */ (0, k.jsx)("h1", { children: "시간표 화면을 표시하지 못했습니다." }),
+			role: "alert",
+			className: "timetable-render-error",
+			style: {
+				padding: "2rem",
+				maxWidth: 640,
+				margin: "5rem auto",
+				fontFamily: "sans-serif"
+			},
+			children: [
+				/* @__PURE__ */ (0, k.jsx)("h1", { children: "시간표 화면을 표시하지 못했습니다." }),
 				/* @__PURE__ */ (0, k.jsx)("p", { children: "저장 작업이 진행되었을 수 있습니다. 다시 실행하기 전에 최신 시간표와 작업 이력을 확인해 주세요." }),
-				/* @__PURE__ */ (0, k.jsx)("button", { type: "button", onClick: () => this.setState({ failed: false }), children: "화면 다시 표시" })]
+				/* @__PURE__ */ (0, k.jsx)("button", {
+					type: "button",
+					onClick: () => this.setState({ failed: !1 }),
+					children: "화면 다시 표시"
+				})
+			]
 		}) : this.props.children;
 	}
-}
-var Fm = /* @__PURE__ */ new Map(), Im;
-function Lm(e) {
+}, Lm = /* @__PURE__ */ new WeakMap();
+function Rm(e) {
 	if (!document.getElementById("timetable-host-layout")) {
 		let e = document.createElement("style");
 		e.id = "timetable-host-layout", e.textContent = "[data-testid=\"stHeader\"]{display:none!important}[data-testid=\"stMainBlockContainer\"]{padding:0!important;max-width:none!important}.block-container{padding:0!important;max-width:none!important}", document.head.appendChild(e);
@@ -19466,37 +19581,52 @@ function Lm(e) {
 		let e = document.createElement("style");
 		e.id = "timetable-github-fonts", e.textContent = "@font-face{font-family:\"Pse Noto Sans KR\";font-weight:300 600;src:url(\"https://cdn.jsdelivr.net/gh/pse915/Timetable@main/NotoSansKR-Light.ttf\") format(\"truetype\");font-display:swap}@font-face{font-family:\"Pse Noto Sans KR\";font-weight:700;src:url(\"https://cdn.jsdelivr.net/gh/pse915/Timetable@main/NotoSansKR-Bold.ttf\") format(\"truetype\");font-display:swap}@font-face{font-family:\"Hakgyoansim Wooju R\";src:url(\"https://cdn.jsdelivr.net/gh/pse915/Timetable@main/HakgyoansimWoojuR.ttf\") format(\"truetype\");font-display:swap}", document.head.appendChild(e);
 	}
-	let r = e.parentElement.querySelector("#timetable-root");
+	let n = e.parentElement, r = n.querySelector("#timetable-root");
 	if (!r) throw Error("Timetable mount point is missing");
-	let i = Fm.get(e.parentElement);
-	if (!i) {
-		i = { root: (0, v.createRoot)(r), current: e.data, setStateValue: e.setStateValue, pending: /* @__PURE__ */ new Map() };
-		Fm.set(e.parentElement, i);
-	} else {
-		i.current = e.data;
-		i.setStateValue = e.setStateValue;
+	let i = Lm.get(n);
+	i ? (i.current = e.data, i.setStateValue = e.setStateValue) : (i = {
+		root: (0, v.createRoot)(r),
+		current: e.data,
+		setStateValue: e.setStateValue,
+		pending: /* @__PURE__ */ new Map()
+	}, Lm.set(n, i));
+	let a = i, o = a.current.response;
+	if (o) {
+		let e = a.pending.get(o.requestId);
+		e && (clearTimeout(e.timer), a.pending.delete(o.requestId), e.resolve(o));
 	}
-	let response = i.current.response;
-	if (response && i.pending.has(response.requestId)) {
-		let waiter = i.pending.get(response.requestId);
-		clearTimeout(waiter.timer), i.pending.delete(response.requestId), waiter.resolve(response);
-	}
-	const send = (t, n) => new Promise((resolve, reject) => {
-		if (Fm.get(e.parentElement) !== i) return reject(Error("시간표 화면이 종료되었습니다."));
-		let requestId = crypto.randomUUID(), request = { operation: t, requestId, payload: n, dataVersion: i.current.dataVersion };
-		let timer = setTimeout(() => {
-			i.pending.delete(requestId), reject(Error("서버 응답을 확인하지 못했습니다. 저장 작업은 다시 누르기 전에 최신 자료를 확인하세요."));
-		}, 12e4);
-		i.pending.set(requestId, { resolve, reject, timer });
-		try { i.setStateValue("request", request); }
-		catch (err) { clearTimeout(timer), i.pending.delete(requestId), reject(err instanceof Error ? err : Error(String(err))); }
-	});
-	i.root.render(/* @__PURE__ */ (0, k.jsx)(TimetableRenderError, { children: /* @__PURE__ */ (0, k.jsx)(Pm, { data: i.current, transport: send }) }));
-	return () => {
-		if (Fm.get(e.parentElement) !== i) return;
-		for (const waiter of i.pending.values()) { clearTimeout(waiter.timer); waiter.reject(Error("화면 연결이 종료되었습니다. 저장 결과를 확인하세요.")); }
-		i.pending.clear(); i.root.unmount(); Fm.delete(e.parentElement);
+	return a.root.render(/* @__PURE__ */ (0, k.jsx)(Im, { children: /* @__PURE__ */ (0, k.jsx)(Fm, {
+		data: a.current,
+		transport: (e, t) => new Promise((r, i) => {
+			if (Lm.get(n) !== a) {
+				i(/* @__PURE__ */ Error("시간표 화면이 종료되었습니다."));
+				return;
+			}
+			let o = crypto.randomUUID(), s = {
+				operation: e,
+				requestId: o,
+				payload: t,
+				dataVersion: a.current.dataVersion
+			}, c = setTimeout(() => {
+				a.pending.delete(o), i(/* @__PURE__ */ Error("서버 응답을 확인하지 못했습니다. 저장 작업은 다시 누르기 전에 최신 자료를 확인하세요."));
+			}, e === "exam_rpc" ? 24e4 : 12e4);
+			a.pending.set(o, {
+				resolve: r,
+				reject: i,
+				timer: c
+			});
+			try {
+				a.setStateValue("request", s);
+			} catch (e) {
+				clearTimeout(c), a.pending.delete(o), i(e instanceof Error ? e : Error(String(e)));
+			}
+		})
+	}) })), () => {
+		if (Lm.get(n) === a) {
+			for (let e of a.pending.values()) clearTimeout(e.timer), e.reject(/* @__PURE__ */ Error("화면 연결이 종료되었습니다. 저장 결과를 확인하세요."));
+			a.pending.clear(), a.root.unmount(), Lm.delete(n);
+		}
 	};
 }
 //#endregion
-export { Lm as default };
+export { Rm as default };
