@@ -52,25 +52,4 @@ for node in ast.walk(tree):
 records.sort(key=lambda x:x['line'])
 metadata = dict(commit='c00647f2f49c09ff03469b83f8f4c0e6baf08d0d',sha256=hashlib.sha256((ROOT/'legacy/timetable_app2_original.py').read_bytes()).hexdigest(),lines=len(source.splitlines()),functions=[dict(name=n.name,line=n.lineno,end=n.end_lineno,body_hash=hashlib.sha256(ast.dump(n,include_attributes=False).encode()).hexdigest()) for n in tree.body if isinstance(n,ast.FunctionDef)],ui=records)
 (ROOT/'backend/schemas/source_inventory.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2),encoding='utf-8')
-head = '''# 원본 기능 목록
-
-기준: GitHub main c00647f2f49c09ff03469b83f8f4c0e6baf08d0d, 7,069줄.
-첨부본은 동일 코드이며 CRLF/LF 줄바꿈만 다르다. 두 파일을 별도 보존했다. `tools/analyze_source.py`로 다시 생성 가능하다.
-이 목록은 모든 AST UI 호출 지점과 함수 정의를 추적한다. 반복문으로 생기는 버튼은 호출 지점 하나에 여러 인스턴스가 있다.
-조건과 의존성은 정적 분석 결과이며 실행 검증을 의미하지 않는다. 메뉴 공통 함수는 여러 화면에서 호출된다.
-React 대응: `NodeRenderer` + `DataGrid`; Python 대응: `LegacyProgram`에서 원본 함수를 그대로 실행.
-각 항목의 역할/시트는 아래 조건 및 JSON의 transitive dependencies를 대조해야 한다. 자동 목록만으로 100% 동등성을 선언하지 않는다.
-
-## 호출 지점
-
-| ID | 메뉴 | 원본 함수/줄 | 사용자 동작 | 백엔드 처리/권한 조건 | 영향받는 시트 | React 대응 | 재현 테스트 | 상태 |
-|---|---|---|---|---|---|---|---|---|
-'''
-rows = []
-for rec in records:
-    conditions = '; '.join(rec['conditions']) or '호출 화면의 서버 권한 사용'
-    rows.append(f"| {rec['id']} | {rec['menu']} | {rec['function']}:{rec['line']} | {rec['kind']} {rec['label']} | {conditions.replace('|','/')[:420]} | {', '.join(rec['sheets']) or '호출부/JSON 대조'} | NodeRenderer/{rec['kind']} | 해당 역할로 조건을 만족시켜 원본과 같은 입력·저장값 비교; 아직 전체 실행 안 함 | 미검증 |")
-head += '\n'.join(rows) + '\n\n## 모든 함수 정의\n\n| 원본 함수 | 시작 | 끝 | 상태 |\n|---|---|---|---|\n'
-head += '\n'.join(f"| {r['name']} | {r['line']} | {r['end']} | 보존 / 개별 동등성 미검증 |" for r in metadata['functions'])
-(ROOT/'docs/reports/FEATURE_INVENTORY.md').write_text(head+'\n',encoding='utf-8')
 print(json.dumps({'functions':len(metadata['functions']),'ui_sites':len(records),'sha256':metadata['sha256']}))

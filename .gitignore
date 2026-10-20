@@ -6,3 +6,10 @@ test-results/
 playwright-report/
 tests/browser-artifacts/
 *.log
+
+# Generated validation artifacts
+/screenshots/
+/performance-results.json
+/native-performance-results.json
+/SHA256SUMS.json
+/native-optimization/performance.patch

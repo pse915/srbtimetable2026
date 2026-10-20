@@ -6,9 +6,7 @@ from backend.domain.program import SOURCE,compile_program
 
 def test_frozen_source_matches_github_baseline():
     assert hashlib.sha256(SOURCE.read_bytes()).hexdigest()=='81ac74ecec9f893fb0027c9113f440af4f51effbf3c26185ba9599d942b36099'
-    attached=SOURCE.with_name('timetable_app2_attached.py')
     normalized=SOURCE.read_text(encoding='utf-8-sig')
-    assert normalized==attached.read_text(encoding='utf-8-sig')
     assert hashlib.sha256(normalized.encode()).hexdigest()=='babc332c92ad0376d791aedd2657bdfb94ea046f95700bbeef8314583cc77b00'
 
 def test_inventory_includes_every_function_and_ui_call():
